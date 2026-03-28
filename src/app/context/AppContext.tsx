@@ -8,7 +8,7 @@ export interface JournalEntry {
   modified_content?: string | null;
   mediator_explanation?: string | null;
   mediator_warning?: string | null;
-  intention?: 'support' | 'accountability' | 'perspective' | null;
+  intention?: 'support' | 'accountability' | 'perspective' | 'connection' | null;
   shared: boolean;
   approved?: boolean;
   // Simulated peer response (joined from DB)
@@ -23,7 +23,7 @@ export interface PeerEntry {
   id: string;
   content: string;
   created_at: string;
-  intention: 'support' | 'accountability' | 'perspective';
+  intention: 'support' | 'accountability' | 'perspective' | 'connection';
   responded: boolean;
 }
 

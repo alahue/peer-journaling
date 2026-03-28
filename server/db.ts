@@ -43,7 +43,7 @@ function createTables(): void {
       modified_content TEXT,
       mediator_explanation TEXT,
       mediator_warning TEXT,
-      intention TEXT CHECK(intention IN ('support','accountability','perspective')),
+      intention TEXT CHECK(intention IN ('support','accountability','perspective','connection')),
       shared INTEGER DEFAULT 0,
       approved INTEGER DEFAULT 0,
       created_at TEXT DEFAULT (datetime('now')),
@@ -54,7 +54,7 @@ function createTables(): void {
       id TEXT PRIMARY KEY,
       target_user_pin TEXT NOT NULL,
       content TEXT NOT NULL,
-      intention TEXT CHECK(intention IN ('support','accountability','perspective')),
+      intention TEXT CHECK(intention IN ('support','accountability','perspective','connection')),
       responded INTEGER DEFAULT 0,
       created_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (target_user_pin) REFERENCES users(pin) ON DELETE CASCADE
