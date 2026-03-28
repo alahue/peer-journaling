@@ -3,8 +3,9 @@ import type { MediatorResult } from '../types.js';
 
 const INTENTION_DESCRIPTIONS: Record<string, string> = {
   support: 'emotional support and understanding',
-  accountability: 'encouragement and accountability',
+  accountability: 'encouragement and support in reaching their goals',
   perspective: 'fresh insights and alternative viewpoints',
+  connection: 'a sense of shared experience and belonging',
 };
 
 function buildSystemPrompt(intention: string): string {

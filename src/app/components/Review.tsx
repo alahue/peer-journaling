@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
-import { ArrowLeft, MessageSquare, FileText, Heart, Target, Lightbulb } from 'lucide-react';
+import { ArrowLeft, MessageSquare, FileText, Heart, Target, Lightbulb, Users } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { useApp } from '../context/AppContext';
 import { Label } from './ui/label';
@@ -66,7 +66,7 @@ export function Review() {
   const currentPeerEntry = peerEntries.find(e => e.id === selectedPeerEntry);
   const currentReflectionEntry = entriesAwaitingReflection.find(e => e.id === selectedReflectionEntry);
 
-  const getIntentionIcon = (intention: 'support' | 'accountability' | 'perspective') => {
+  const getIntentionIcon = (intention: 'support' | 'accountability' | 'perspective' | 'connection') => {
     switch (intention) {
       case 'support':
         return <Heart className="w-4 h-4 text-pink-500" />;
@@ -74,6 +74,8 @@ export function Review() {
         return <Target className="w-4 h-4 text-blue-500" />;
       case 'perspective':
         return <Lightbulb className="w-4 h-4 text-yellow-500" />;
+      case 'connection':
+        return <Users className="w-4 h-4 text-green-500" />;
     }
   };
 

@@ -46,7 +46,7 @@ export function MainMenu() {
                   <div>
                     <h3 className="font-semibold text-base mb-2">📤 Share</h3>
                     <p className="text-gray-600">
-                      Select an entry to share with a peer. Choose your intention (support, accountability, or perspective), 
+                      Select an entry to share with a peer. Choose your intention (support, accountability & goals, perspective, or connection),
                       and our AI will help prepare it for sharing. You can review and edit before sending.
                     </p>
                   </div>

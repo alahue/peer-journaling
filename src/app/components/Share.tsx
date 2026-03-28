@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
-import { ArrowLeft, Heart, Target, Lightbulb, Sparkles, AlertTriangle, Loader2 } from 'lucide-react';
+import { ArrowLeft, Heart, Target, Lightbulb, Users, Sparkles, AlertTriangle, Loader2 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { Label } from './ui/label';
@@ -11,7 +11,7 @@ import { Textarea } from './ui/textarea';
 import { ScrollArea } from './ui/scroll-area';
 import * as api from '../utils/api';
 
-type Intention = 'support' | 'accountability' | 'perspective';
+type Intention = 'support' | 'accountability' | 'perspective' | 'connection';
 
 export function Share() {
   const navigate = useNavigate();
@@ -117,8 +117,8 @@ export function Share() {
                   <Label htmlFor="accountability" className="flex items-center gap-2 cursor-pointer flex-1">
                     <Target className="w-5 h-5 text-blue-500" />
                     <div>
-                      <div className="font-medium">Accountability</div>
-                      <div className="text-sm text-gray-600">Looking for encouragement to stay on track</div>
+                      <div className="font-medium">Accountability & Goals</div>
+                      <div className="text-sm text-gray-600">Looking for encouragement and support in reaching your goals</div>
                     </div>
                   </Label>
                 </div>
@@ -129,6 +129,16 @@ export function Share() {
                     <div>
                       <div className="font-medium">Perspective</div>
                       <div className="text-sm text-gray-600">Seeking fresh insights and viewpoints</div>
+                    </div>
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2 p-3 border rounded-lg hover:bg-gray-50">
+                  <RadioGroupItem value="connection" id="connection" />
+                  <Label htmlFor="connection" className="flex items-center gap-2 cursor-pointer flex-1">
+                    <Users className="w-5 h-5 text-green-500" />
+                    <div>
+                      <div className="font-medium">Connection</div>
+                      <div className="text-sm text-gray-600">Seeking shared experience and a sense of belonging</div>
                     </div>
                   </Label>
                 </div>

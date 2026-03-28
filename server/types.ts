@@ -11,7 +11,7 @@ export interface JournalEntry {
   modified_content: string | null;
   mediator_explanation: string | null;
   mediator_warning: string | null;
-  intention: 'support' | 'accountability' | 'perspective' | null;
+  intention: 'support' | 'accountability' | 'perspective' | 'connection' | null;
   shared: number;
   approved: number;
   created_at: string;
@@ -21,7 +21,7 @@ export interface PeerEntry {
   id: string;
   target_user_pin: string;
   content: string;
-  intention: 'support' | 'accountability' | 'perspective';
+  intention: 'support' | 'accountability' | 'perspective' | 'connection';
   responded: number;
   created_at: string;
 }
