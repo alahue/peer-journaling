@@ -1,0 +1,436 @@
+import { useState, useEffect } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { Label } from './ui/label';
+import { Badge } from './ui/badge';
+import { Separator } from './ui/separator';
+import { ScrollArea } from './ui/scroll-area';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from './ui/alert-dialog';
+import { Lock, Plus, Trash2, Eye, ArrowLeft } from 'lucide-react';
+import * as api from '../utils/api';
+
+interface UserRow {
+  pin: string;
+  created_at: string;
+  is_active: number;
+  entry_count: number;
+  peer_entry_count: number;
+}
+
+export function Admin() {
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [password, setPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
+  const [users, setUsers] = useState<UserRow[]>([]);
+  const [newPin, setNewPin] = useState('');
+  const [createError, setCreateError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  // History view state
+  const [viewingUser, setViewingUser] = useState<string | null>(null);
+  const [userHistory, setUserHistory] = useState<any>(null);
+  const [selectedEntry, setSelectedEntry] = useState<any>(null);
+
+  // Delete confirmation
+  const [deleteTarget, setDeleteTarget] = useState<{ type: 'user' | 'entry'; id: string } | null>(null);
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginError('');
+    try {
+      await api.adminLogin(password);
+      setIsLoggedIn(true);
+      await loadUsers();
+    } catch (err: any) {
+      setLoginError(err.message || 'Login failed');
+    }
+  };
+
+  const loadUsers = async () => {
+    try {
+      const data = await api.adminGetUsers();
+      setUsers(data);
+    } catch (err) {
+      console.error('Failed to load users:', err);
+    }
+  };
+
+  const handleCreateUser = async () => {
+    setCreateError('');
+    if (!newPin || newPin.length !== 4 || !/^\d{4}$/.test(newPin)) {
+      setCreateError('Please enter a valid 4-digit PIN');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await api.adminCreateUser(newPin);
+      setNewPin('');
+      await loadUsers();
+    } catch (err: any) {
+      setCreateError(err.message || 'Failed to create user');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteUser = async (pin: string) => {
+    try {
+      await api.adminDeleteUser(pin);
+      await loadUsers();
+      if (viewingUser === pin) {
+        setViewingUser(null);
+        setUserHistory(null);
+      }
+    } catch (err) {
+      console.error('Failed to delete user:', err);
+    }
+    setDeleteTarget(null);
+  };
+
+  const handleDeleteEntry = async (id: string) => {
+    try {
+      await api.adminDeleteEntry(id);
+      if (viewingUser) {
+        await loadUserHistory(viewingUser);
+      }
+    } catch (err) {
+      console.error('Failed to delete entry:', err);
+    }
+    setDeleteTarget(null);
+  };
+
+  const loadUserHistory = async (pin: string) => {
+    try {
+      const data = await api.adminGetUserHistory(pin);
+      setUserHistory(data);
+      setViewingUser(pin);
+    } catch (err) {
+      console.error('Failed to load history:', err);
+    }
+  };
+
+  // Login screen
+  if (!isLoggedIn) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200 p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center space-y-4">
+            <div className="flex justify-center">
+              <div className="p-4 bg-gray-800 rounded-full">
+                <Lock className="w-12 h-12 text-white" />
+              </div>
+            </div>
+            <div>
+              <CardTitle className="text-2xl">Admin Dashboard</CardTitle>
+              <CardDescription>Enter admin password to continue</CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="admin-password">Password</Label>
+                <Input
+                  id="admin-password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => { setPassword(e.target.value); setLoginError(''); }}
+                  placeholder="Enter admin password"
+                />
+                {loginError && (
+                  <p className="text-sm text-red-500">{loginError}</p>
+                )}
+              </div>
+              <Button type="submit" className="w-full">
+                Login
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // User history view
+  if (viewingUser && userHistory) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-100 to-gray-200 p-6">
+        <div className="max-w-4xl mx-auto space-y-4">
+          <Button variant="ghost" onClick={() => { setViewingUser(null); setUserHistory(null); }}>
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Users
+          </Button>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>User History: PIN {viewingUser}</CardTitle>
+              <CardDescription>
+                Created: {new Date(userHistory.user.created_at + 'Z').toLocaleString()}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Journal Entries */}
+              <div>
+                <h3 className="font-semibold text-lg mb-3">Journal Entries ({userHistory.journalEntries.length})</h3>
+                {userHistory.journalEntries.length === 0 ? (
+                  <p className="text-gray-500 text-sm">No journal entries</p>
+                ) : (
+                  <div className="space-y-3">
+                    {userHistory.journalEntries.map((entry: any) => (
+                      <div key={entry.id} className="p-4 border rounded-lg">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="text-xs text-gray-500">
+                                {new Date(entry.created_at + 'Z').toLocaleString()}
+                              </span>
+                              {!!entry.shared && <Badge variant="secondary" className="text-xs">Shared</Badge>}
+                              {entry.intention && <Badge variant="outline" className="text-xs capitalize">{entry.intention}</Badge>}
+                              {entry.sim_what_i_heard && <Badge variant="secondary" className="text-xs">Has AI Response</Badge>}
+                              {entry.reflection_content && <Badge variant="secondary" className="text-xs">Reflected</Badge>}
+                            </div>
+                            <p className="text-sm line-clamp-3 cursor-pointer hover:text-indigo-600"
+                               onClick={() => setSelectedEntry(entry)}>
+                              {entry.content}
+                            </p>
+                          </div>
+                          <Button
+                            variant="ghost" size="icon" className="h-8 w-8"
+                            onClick={() => setDeleteTarget({ type: 'entry', id: entry.id })}
+                          >
+                            <Trash2 className="w-4 h-4 text-red-500" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <Separator />
+
+              {/* Peer Entries */}
+              <div>
+                <h3 className="font-semibold text-lg mb-3">Peer Entries ({userHistory.peerEntries.length})</h3>
+                {userHistory.peerEntries.length === 0 ? (
+                  <p className="text-gray-500 text-sm">No peer entries</p>
+                ) : (
+                  <div className="space-y-3">
+                    {userHistory.peerEntries.map((entry: any) => (
+                      <div key={entry.id} className="p-4 border rounded-lg">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-xs text-gray-500">
+                            {new Date(entry.created_at + 'Z').toLocaleString()}
+                          </span>
+                          <Badge variant="outline" className="text-xs capitalize">{entry.intention}</Badge>
+                          {!!entry.responded && <Badge variant="secondary" className="text-xs">Responded</Badge>}
+                        </div>
+                        <p className="text-sm line-clamp-3">{entry.content}</p>
+                        {entry.what_i_heard && (
+                          <div className="mt-3 pt-3 border-t text-sm space-y-1">
+                            <p><span className="font-medium">What I heard:</span> {entry.what_i_heard}</p>
+                            <p><span className="font-medium">What I'm wondering:</span> {entry.what_im_wondering}</p>
+                            <p><span className="font-medium">What I suggest:</span> {entry.what_i_suggest}</p>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Entry Detail Dialog */}
+          <Dialog open={!!selectedEntry} onOpenChange={(open) => !open && setSelectedEntry(null)}>
+            <DialogContent className="max-w-3xl max-h-[80vh]">
+              <DialogHeader>
+                <DialogTitle>Entry Details</DialogTitle>
+              </DialogHeader>
+              {selectedEntry && (
+                <ScrollArea className="max-h-[calc(80vh-120px)]">
+                  <div className="space-y-4 pr-4">
+                    <div>
+                      <h4 className="font-semibold mb-1">Original Entry</h4>
+                      <p className="text-sm whitespace-pre-wrap bg-gray-50 p-3 rounded-lg">{selectedEntry.content}</p>
+                    </div>
+                    {selectedEntry.modified_content && (
+                      <div>
+                        <h4 className="font-semibold mb-1">Modified Entry (Sent)</h4>
+                        <p className="text-sm whitespace-pre-wrap bg-blue-50 p-3 rounded-lg">{selectedEntry.modified_content}</p>
+                      </div>
+                    )}
+                    {selectedEntry.mediator_explanation && (
+                      <div>
+                        <h4 className="font-semibold mb-1">AI Explanation</h4>
+                        <p className="text-sm whitespace-pre-wrap bg-amber-50 p-3 rounded-lg">{selectedEntry.mediator_explanation}</p>
+                      </div>
+                    )}
+                    {selectedEntry.mediator_warning && (
+                      <div>
+                        <h4 className="font-semibold mb-1 text-orange-600">AI Warning</h4>
+                        <p className="text-sm whitespace-pre-wrap bg-orange-50 p-3 rounded-lg">{selectedEntry.mediator_warning}</p>
+                      </div>
+                    )}
+                    {selectedEntry.sim_what_i_heard && (
+                      <div>
+                        <h4 className="font-semibold mb-1">Simulated Peer Response</h4>
+                        <div className="text-sm bg-green-50 p-3 rounded-lg space-y-2">
+                          <p><span className="font-medium">What I heard:</span> {selectedEntry.sim_what_i_heard}</p>
+                          <p><span className="font-medium">What I'm wondering:</span> {selectedEntry.sim_what_im_wondering}</p>
+                          <p><span className="font-medium">What I suggest:</span> {selectedEntry.sim_what_i_suggest}</p>
+                        </div>
+                      </div>
+                    )}
+                    {selectedEntry.reflection_content && (
+                      <div>
+                        <h4 className="font-semibold mb-1">Reflection Addendum</h4>
+                        <p className="text-sm whitespace-pre-wrap bg-purple-50 p-3 rounded-lg">{selectedEntry.reflection_content}</p>
+                      </div>
+                    )}
+                  </div>
+                </ScrollArea>
+              )}
+            </DialogContent>
+          </Dialog>
+
+          {/* Delete Confirmation */}
+          <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>
+                  Delete {deleteTarget?.type === 'user' ? 'User' : 'Entry'}
+                </AlertDialogTitle>
+                <AlertDialogDescription>
+                  This action cannot be undone.
+                  {deleteTarget?.type === 'user' && ' All user data will be permanently deleted.'}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => {
+                    if (deleteTarget?.type === 'user') handleDeleteUser(deleteTarget.id);
+                    else if (deleteTarget?.type === 'entry') handleDeleteEntry(deleteTarget.id);
+                  }}
+                  className="bg-red-500 hover:bg-red-600"
+                >
+                  Delete
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
+      </div>
+    );
+  }
+
+  // Main admin dashboard
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-100 to-gray-200 p-6">
+      <div className="max-w-4xl mx-auto space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
+            <p className="text-gray-600 mt-1">Manage users and study data</p>
+          </div>
+          <Button variant="outline" onClick={() => { setIsLoggedIn(false); api.setAdminToken(null); }}>
+            Logout
+          </Button>
+        </div>
+
+        {/* Create User */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Create User</CardTitle>
+            <CardDescription>Add a new participant with a 4-digit PIN</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-end gap-3">
+              <div className="space-y-2 flex-1 max-w-xs">
+                <Label htmlFor="new-pin">4-Digit PIN</Label>
+                <Input
+                  id="new-pin"
+                  value={newPin}
+                  onChange={(e) => { setNewPin(e.target.value.replace(/\D/g, '').slice(0, 4)); setCreateError(''); }}
+                  placeholder="e.g. 1234"
+                  maxLength={4}
+                />
+                {createError && <p className="text-sm text-red-500">{createError}</p>}
+              </div>
+              <Button onClick={handleCreateUser} disabled={loading} className="gap-2">
+                <Plus className="w-4 h-4" />
+                {loading ? 'Creating...' : 'Create User'}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* User List */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Users ({users.length})</CardTitle>
+            <CardDescription>All registered participants</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {users.length === 0 ? (
+              <p className="text-gray-500 text-center py-8">
+                No users yet. Create one above to get started.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {users.map(user => (
+                  <div key={user.pin} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50">
+                    <div className="flex items-center gap-4">
+                      <span className="font-mono text-lg font-semibold">{user.pin}</span>
+                      <span className="text-sm text-gray-500">
+                        Created: {new Date(user.created_at + 'Z').toLocaleDateString()}
+                      </span>
+                      <Badge variant="secondary">{user.entry_count} entries</Badge>
+                      <Badge variant="outline">{user.peer_entry_count} peer entries</Badge>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" size="sm" className="gap-1" onClick={() => loadUserHistory(user.pin)}>
+                        <Eye className="w-4 h-4" />
+                        View History
+                      </Button>
+                      <Button
+                        variant="ghost" size="icon" className="h-8 w-8"
+                        onClick={() => setDeleteTarget({ type: 'user', id: user.pin })}
+                      >
+                        <Trash2 className="w-4 h-4 text-red-500" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Delete Confirmation */}
+        <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete User</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will permanently delete user PIN {deleteTarget?.id} and all associated data. This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => deleteTarget && handleDeleteUser(deleteTarget.id)}
+                className="bg-red-500 hover:bg-red-600"
+              >
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
+    </div>
+  );
+}

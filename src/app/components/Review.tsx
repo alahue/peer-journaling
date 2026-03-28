@@ -8,40 +8,59 @@ import { useApp } from '../context/AppContext';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { Badge } from './ui/badge';
+import * as api from '../utils/api';
 
 export function Review() {
   const navigate = useNavigate();
-  const { peerEntries, removePeerEntry, entriesAwaitingReflection, removeReflectionEntry, updateJournalEntry } = useApp();
-  
+  const { peerEntries, removePeerEntry, entriesAwaitingReflection, removeReflectionEntry, refreshData } = useApp();
+
   const [selectedPeerEntry, setSelectedPeerEntry] = useState<string | null>(null);
   const [whatIHeard, setWhatIHeard] = useState('');
   const [whatImWondering, setWhatImWondering] = useState('');
   const [whatISuggest, setWhatISuggest] = useState('');
+  const [submittingPeer, setSubmittingPeer] = useState(false);
 
   const [selectedReflectionEntry, setSelectedReflectionEntry] = useState<string | null>(null);
   const [reflectionResponse, setReflectionResponse] = useState('');
+  const [submittingReflection, setSubmittingReflection] = useState(false);
 
-  const handleSubmitPeerResponse = () => {
+  const handleSubmitPeerResponse = async () => {
     if (!selectedPeerEntry || !whatIHeard || !whatImWondering || !whatISuggest) return;
 
-    // In a real app, this would send the response back to the peer
-    removePeerEntry(selectedPeerEntry);
-    setSelectedPeerEntry(null);
-    setWhatIHeard('');
-    setWhatImWondering('');
-    setWhatISuggest('');
+    setSubmittingPeer(true);
+    try {
+      await api.submitPeerResponse(selectedPeerEntry, {
+        what_i_heard: whatIHeard,
+        what_im_wondering: whatImWondering,
+        what_i_suggest: whatISuggest,
+      });
+      removePeerEntry(selectedPeerEntry);
+      setSelectedPeerEntry(null);
+      setWhatIHeard('');
+      setWhatImWondering('');
+      setWhatISuggest('');
+    } catch (err) {
+      console.error('Failed to submit peer response:', err);
+    } finally {
+      setSubmittingPeer(false);
+    }
   };
 
-  const handleSubmitReflection = () => {
+  const handleSubmitReflection = async () => {
     if (!selectedReflectionEntry || !reflectionResponse) return;
 
-    updateJournalEntry(selectedReflectionEntry, {
-      reflectionAddendum: reflectionResponse
-    });
-    
-    removeReflectionEntry(selectedReflectionEntry);
-    setSelectedReflectionEntry(null);
-    setReflectionResponse('');
+    setSubmittingReflection(true);
+    try {
+      await api.submitReflection(selectedReflectionEntry, reflectionResponse);
+      removeReflectionEntry(selectedReflectionEntry);
+      setSelectedReflectionEntry(null);
+      setReflectionResponse('');
+      await refreshData();
+    } catch (err) {
+      console.error('Failed to submit reflection:', err);
+    } finally {
+      setSubmittingReflection(false);
+    }
   };
 
   const currentPeerEntry = peerEntries.find(e => e.id === selectedPeerEntry);
@@ -113,8 +132,8 @@ export function Review() {
                             onClick={() => setSelectedPeerEntry(entry.id)}
                           >
                             <div className="text-xs text-gray-500 mb-1">
-                              {entry.timestamp.toLocaleDateString('en-US', { 
-                                month: 'short', 
+                              {new Date(entry.created_at + 'Z').toLocaleDateString('en-US', {
+                                month: 'short',
                                 day: 'numeric',
                                 hour: '2-digit',
                                 minute: '2-digit'
@@ -175,12 +194,12 @@ export function Review() {
                               />
                             </div>
 
-                            <Button 
+                            <Button
                               onClick={handleSubmitPeerResponse}
-                              disabled={!whatIHeard || !whatImWondering || !whatISuggest}
+                              disabled={!whatIHeard || !whatImWondering || !whatISuggest || submittingPeer}
                               className="w-full"
                             >
-                              Submit Response
+                              {submittingPeer ? 'Submitting...' : 'Submit Response'}
                             </Button>
                           </div>
                         </>
@@ -215,8 +234,8 @@ export function Review() {
                             onClick={() => setSelectedReflectionEntry(entry.id)}
                           >
                             <div className="text-xs text-gray-500 mb-1">
-                              {entry.timestamp.toLocaleDateString('en-US', { 
-                                month: 'short', 
+                              {new Date(entry.created_at + 'Z').toLocaleDateString('en-US', {
+                                month: 'short',
                                 day: 'numeric',
                                 hour: '2-digit',
                                 minute: '2-digit'
@@ -243,24 +262,26 @@ export function Review() {
                                   </Badge>
                                 )}
                               </div>
-                              <p className="text-sm mt-1">{currentReflectionEntry.content}</p>
+                              <p className="text-sm mt-1">
+                                {currentReflectionEntry.modified_content || currentReflectionEntry.content}
+                              </p>
                             </div>
-                            
-                            {currentReflectionEntry.peerResponse && (
+
+                            {currentReflectionEntry.sim_what_i_heard && (
                               <div className="pt-3 border-t space-y-2">
                                 <Label className="text-sm font-medium">Peer Response</Label>
                                 <div className="space-y-2 text-sm">
                                   <div>
                                     <span className="font-medium">What I heard: </span>
-                                    {currentReflectionEntry.peerResponse.whatIHeard}
+                                    {currentReflectionEntry.sim_what_i_heard}
                                   </div>
                                   <div>
                                     <span className="font-medium">What I'm wondering: </span>
-                                    {currentReflectionEntry.peerResponse.whatImWondering}
+                                    {currentReflectionEntry.sim_what_im_wondering}
                                   </div>
                                   <div>
                                     <span className="font-medium">What I suggest: </span>
-                                    {currentReflectionEntry.peerResponse.whatISuggest}
+                                    {currentReflectionEntry.sim_what_i_suggest}
                                   </div>
                                 </div>
                               </div>
@@ -280,12 +301,12 @@ export function Review() {
                             />
                           </div>
 
-                          <Button 
+                          <Button
                             onClick={handleSubmitReflection}
-                            disabled={!reflectionResponse}
+                            disabled={!reflectionResponse || submittingReflection}
                             className="w-full"
                           >
-                            Submit Reflection
+                            {submittingReflection ? 'Submitting...' : 'Submit Reflection'}
                           </Button>
                         </>
                       ) : (

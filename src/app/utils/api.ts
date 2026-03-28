@@ -1,0 +1,199 @@
+let currentPin: string | null = null;
+
+export function setApiPin(pin: string | null) {
+  currentPin = pin;
+}
+
+export function getApiPin(): string | null {
+  return currentPin;
+}
+
+async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(options.headers as Record<string, string> || {}),
+  };
+
+  if (currentPin) {
+    headers['X-User-PIN'] = currentPin;
+  }
+
+  const res = await fetch(`/api${path}`, {
+    ...options,
+    headers,
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: 'Request failed' }));
+    throw new Error(body.error || `HTTP ${res.status}`);
+  }
+
+  return res.json();
+}
+
+// Auth
+export async function login(pin: string) {
+  const result = await request<{ success: boolean; user: any }>('/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({ pin }),
+  });
+  setApiPin(pin);
+  return result;
+}
+
+export async function logout() {
+  await request('/auth/logout', { method: 'POST' });
+  setApiPin(null);
+}
+
+// Journal Entries
+export async function getEntries() {
+  return request<any[]>('/entries');
+}
+
+export async function createEntry(content: string) {
+  return request<any>('/entries', {
+    method: 'POST',
+    body: JSON.stringify({ content }),
+  });
+}
+
+export async function updateEntry(id: string, updates: Record<string, any>) {
+  return request<any>(`/entries/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(updates),
+  });
+}
+
+export async function deleteEntry(id: string) {
+  return request<{ success: boolean }>(`/entries/${id}`, { method: 'DELETE' });
+}
+
+// Sharing
+export async function mediateEntry(entryId: string, intention: string) {
+  return request<{
+    polished_entry: string;
+    explanation: string;
+    warning: string | null;
+    validation_passed: boolean;
+    validation_issues: string[];
+  }>('/sharing/mediate', {
+    method: 'POST',
+    body: JSON.stringify({ entryId, intention }),
+  });
+}
+
+export async function approveSharing(
+  entryId: string,
+  polishedEntry: string,
+  intention: string,
+  explanation?: string,
+  warning?: string | null
+) {
+  return request<{ success: boolean }>('/sharing/approve', {
+    method: 'POST',
+    body: JSON.stringify({
+      entryId,
+      polished_entry: polishedEntry,
+      intention,
+      explanation,
+      warning,
+    }),
+  });
+}
+
+export async function denySharing(entryId: string) {
+  return request<{ success: boolean }>('/sharing/deny', {
+    method: 'POST',
+    body: JSON.stringify({ entryId }),
+  });
+}
+
+// Peers
+export async function getPeerEntries() {
+  return request<any[]>('/peers');
+}
+
+export async function submitPeerResponse(
+  peerEntryId: string,
+  response: { what_i_heard: string; what_im_wondering: string; what_i_suggest: string }
+) {
+  return request<{ success: boolean }>(`/peers/${peerEntryId}/respond`, {
+    method: 'POST',
+    body: JSON.stringify(response),
+  });
+}
+
+// Reflections
+export async function getPendingReflections() {
+  return request<any[]>('/reflections/pending');
+}
+
+export async function submitReflection(journalEntryId: string, content: string) {
+  return request<{ success: boolean }>('/reflections', {
+    method: 'POST',
+    body: JSON.stringify({ journal_entry_id: journalEntryId, content }),
+  });
+}
+
+// Admin
+let adminToken: string | null = null;
+
+export function setAdminToken(token: string | null) {
+  adminToken = token;
+}
+
+async function adminRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(options.headers as Record<string, string> || {}),
+  };
+
+  if (adminToken) {
+    headers['X-Admin-Token'] = adminToken;
+  }
+
+  const res = await fetch(`/api/admin${path}`, {
+    ...options,
+    headers,
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: 'Request failed' }));
+    throw new Error(body.error || `HTTP ${res.status}`);
+  }
+
+  return res.json();
+}
+
+export async function adminLogin(password: string) {
+  const result = await adminRequest<{ token: string }>('/login', {
+    method: 'POST',
+    body: JSON.stringify({ password }),
+  });
+  adminToken = result.token;
+  return result;
+}
+
+export async function adminGetUsers() {
+  return adminRequest<any[]>('/users');
+}
+
+export async function adminCreateUser(pin: string) {
+  return adminRequest<{ success: boolean; pin: string }>('/users', {
+    method: 'POST',
+    body: JSON.stringify({ pin }),
+  });
+}
+
+export async function adminDeleteUser(pin: string) {
+  return adminRequest<{ success: boolean }>(`/users/${pin}`, { method: 'DELETE' });
+}
+
+export async function adminGetUserHistory(pin: string) {
+  return adminRequest<{ user: any; journalEntries: any[]; peerEntries: any[] }>(`/users/${pin}/history`);
+}
+
+export async function adminDeleteEntry(id: string) {
+  return adminRequest<{ success: boolean }>(`/entries/${id}`, { method: 'DELETE' });
+}

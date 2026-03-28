@@ -2,56 +2,84 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
-import { ArrowLeft, Heart, Target, Lightbulb, Sparkles } from 'lucide-react';
+import { ArrowLeft, Heart, Target, Lightbulb, Sparkles, AlertTriangle, Loader2 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { Label } from './ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
 import { Textarea } from './ui/textarea';
-import { modifyEntryForSharing } from '../utils/llm-mock';
 import { ScrollArea } from './ui/scroll-area';
+import * as api from '../utils/api';
 
 type Intention = 'support' | 'accountability' | 'perspective';
 
 export function Share() {
   const navigate = useNavigate();
-  const { journalEntries, updateJournalEntry } = useApp();
+  const { journalEntries, refreshData } = useApp();
   const [selectedEntry, setSelectedEntry] = useState<string | null>(null);
   const [intention, setIntention] = useState<Intention>('support');
   const [showPreview, setShowPreview] = useState(false);
-  const [modifiedContent, setModifiedContent] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  // Mediator output sections
+  const [polishedEntry, setPolishedEntry] = useState('');
+  const [explanation, setExplanation] = useState('');
+  const [warning, setWarning] = useState<string | null>(null);
+  const [validationPassed, setValidationPassed] = useState(true);
+  const [validationIssues, setValidationIssues] = useState<string[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   const unsharedEntries = journalEntries.filter(entry => !entry.shared);
 
-  const handleGeneratePreview = () => {
+  const handleGeneratePreview = async () => {
     if (!selectedEntry) return;
+    setLoading(true);
+    setError(null);
 
-    const entry = journalEntries.find(e => e.id === selectedEntry);
-    if (!entry) return;
-
-    const modified = modifyEntryForSharing(entry.content, intention);
-    setModifiedContent(modified);
-    setShowPreview(true);
+    try {
+      const result = await api.mediateEntry(selectedEntry, intention);
+      setPolishedEntry(result.polished_entry);
+      setExplanation(result.explanation);
+      setWarning(result.warning);
+      setValidationPassed(result.validation_passed);
+      setValidationIssues(result.validation_issues);
+      setShowPreview(true);
+    } catch (err: any) {
+      setError(err.message || 'Failed to generate preview');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleApprove = () => {
+  const handleApprove = async () => {
     if (!selectedEntry) return;
+    setLoading(true);
 
-    updateJournalEntry(selectedEntry, {
-      shared: true,
-      modifiedContent,
-      intention,
-    });
+    try {
+      await api.approveSharing(selectedEntry, polishedEntry, intention, explanation, warning);
+      await refreshData();
+      setShowPreview(false);
+      setSelectedEntry(null);
+      setPolishedEntry('');
+      setExplanation('');
+      setWarning(null);
+      navigate('/menu');
+    } catch (err: any) {
+      setError(err.message || 'Failed to approve sharing');
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  const handleDeny = async () => {
+    if (selectedEntry) {
+      await api.denySharing(selectedEntry).catch(() => {});
+    }
     setShowPreview(false);
-    setSelectedEntry(null);
-    setModifiedContent('');
+    setPolishedEntry('');
+    setExplanation('');
+    setWarning(null);
     navigate('/menu');
-  };
-
-  const handleDeny = () => {
-    setShowPreview(false);
-    setModifiedContent('');
   };
 
   return (
@@ -126,9 +154,9 @@ export function Share() {
                         onClick={() => setSelectedEntry(entry.id)}
                       >
                         <div className="text-sm text-gray-500 mb-2">
-                          {entry.timestamp.toLocaleDateString('en-US', { 
-                            month: 'short', 
-                            day: 'numeric', 
+                          {new Date(entry.created_at + 'Z').toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
                             year: 'numeric',
                             hour: '2-digit',
                             minute: '2-digit'
@@ -142,14 +170,29 @@ export function Share() {
               )}
             </div>
 
+            {error && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                {error}
+              </div>
+            )}
+
             <div className="flex justify-end">
-              <Button 
-                onClick={handleGeneratePreview} 
-                disabled={!selectedEntry}
+              <Button
+                onClick={handleGeneratePreview}
+                disabled={!selectedEntry || loading}
                 className="gap-2"
               >
-                <Sparkles className="w-4 h-4" />
-                Generate Sharing Preview
+                {loading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4" />
+                    Generate Sharing Preview
+                  </>
+                )}
               </Button>
             </div>
           </CardContent>
@@ -157,30 +200,92 @@ export function Share() {
 
         {/* Preview Dialog */}
         <Dialog open={showPreview} onOpenChange={setShowPreview}>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-2xl max-h-[85vh]">
             <DialogHeader>
               <DialogTitle>Review Modified Entry</DialogTitle>
               <DialogDescription>
-                Our AI has prepared your entry for sharing. You can edit it before sending to a peer.
+                Our AI has prepared your entry for sharing. Review the changes below. You can edit the polished entry before sending.
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <Label className="text-sm font-medium">Modified Entry</Label>
-                <Textarea
-                  value={modifiedContent}
-                  onChange={(e) => setModifiedContent(e.target.value)}
-                  className="mt-2 min-h-[200px]"
-                />
+            <ScrollArea className="max-h-[calc(85vh-200px)]">
+              <div className="space-y-4 pr-4">
+                {/* Validation Issues */}
+                {!validationPassed && validationIssues.length > 0 && (
+                  <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <div className="flex items-center gap-2 mb-1">
+                      <AlertTriangle className="w-4 h-4 text-red-500" />
+                      <span className="font-medium text-sm text-red-700">Validation Issues</span>
+                    </div>
+                    <ul className="text-sm text-red-600 list-disc list-inside">
+                      {validationIssues.map((issue, i) => (
+                        <li key={i}>{issue}</li>
+                      ))}
+                    </ul>
+                    <p className="text-xs text-red-500 mt-2">
+                      Please edit the entry below to resolve these issues, then click "Re-validate".
+                    </p>
+                  </div>
+                )}
+
+                {/* Warning */}
+                {warning && (
+                  <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                    <div className="flex items-center gap-2 mb-1">
+                      <AlertTriangle className="w-4 h-4 text-orange-500" />
+                      <span className="font-medium text-sm text-orange-700">Assistant Warning</span>
+                    </div>
+                    <p className="text-sm text-orange-600">{warning}</p>
+                  </div>
+                )}
+
+                {/* Polished Entry - Editable */}
+                <div>
+                  <Label className="text-sm font-medium">Polished Entry (editable)</Label>
+                  <Textarea
+                    value={polishedEntry}
+                    onChange={(e) => setPolishedEntry(e.target.value)}
+                    className="mt-2 min-h-[200px]"
+                  />
+                </div>
+
+                {/* Explanation - Read Only */}
+                {explanation && (
+                  <div>
+                    <Label className="text-sm font-medium">Explanation of Changes</Label>
+                    <div className="mt-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                      <p className="text-sm text-amber-800 whitespace-pre-wrap">{explanation}</p>
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
+            </ScrollArea>
             <DialogFooter>
               <Button variant="outline" onClick={handleDeny}>
                 Deny
               </Button>
-              <Button onClick={handleApprove}>
-                Approve & Send
-              </Button>
+              {!validationPassed ? (
+                <Button onClick={handleGeneratePreview} disabled={loading}>
+                  {loading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                      Re-validating...
+                    </>
+                  ) : (
+                    'Re-validate'
+                  )}
+                </Button>
+              ) : (
+                <Button onClick={handleApprove} disabled={loading}>
+                  {loading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                      Sending...
+                    </>
+                  ) : (
+                    'Approve & Send'
+                  )}
+                </Button>
+              )}
             </DialogFooter>
           </DialogContent>
         </Dialog>
