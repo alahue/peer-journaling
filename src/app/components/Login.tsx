@@ -5,24 +5,36 @@ import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { BookHeart } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import * as api from '../utils/api';
 
 export function Login() {
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const { setCurrentUser } = useApp();
+  const { setCurrentUser, refreshData } = useApp();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (pin.length !== 4) {
       setError('Please enter a 4-digit PIN');
       return;
     }
-    
-    // Mock authentication - accept any 4-digit PIN
-    setCurrentUser(pin);
-    navigate('/menu');
+
+    setLoading(true);
+    setError('');
+
+    try {
+      await api.login(pin);
+      setCurrentUser(pin);
+      await refreshData();
+      navigate('/menu');
+    } catch (err: any) {
+      setError(err.message || 'Login failed');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -68,8 +80,8 @@ export function Login() {
                 <p className="text-sm text-red-500 text-center">{error}</p>
               )}
             </div>
-            <Button type="submit" className="w-full" size="lg">
-              Login
+            <Button type="submit" className="w-full" size="lg" disabled={loading}>
+              {loading ? 'Logging in...' : 'Login'}
             </Button>
           </form>
         </CardContent>

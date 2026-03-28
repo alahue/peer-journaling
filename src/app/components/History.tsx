@@ -10,6 +10,17 @@ import { Badge } from './ui/badge';
 import { Separator } from './ui/separator';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from './ui/alert-dialog';
 
+function formatDate(dateStr: string, options?: Intl.DateTimeFormatOptions) {
+  return new Date(dateStr + 'Z').toLocaleDateString('en-US', options || {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 export function History() {
   const navigate = useNavigate();
   const { journalEntries, deleteJournalEntry } = useApp();
@@ -18,8 +29,8 @@ export function History() {
 
   const currentEntry = journalEntries.find(e => e.id === selectedEntry);
 
-  const handleDelete = (id: string) => {
-    deleteJournalEntry(id);
+  const handleDelete = async (id: string) => {
+    await deleteJournalEntry(id);
     setDeleteConfirmId(null);
     if (selectedEntry === id) {
       setSelectedEntry(null);
@@ -55,28 +66,21 @@ export function History() {
                       className="p-4 border rounded-lg hover:bg-gray-50 transition-colors group"
                     >
                       <div className="flex items-start justify-between gap-4">
-                        <div 
+                        <div
                           className="flex-1 min-w-0 cursor-pointer"
                           onClick={() => setSelectedEntry(entry.id)}
                         >
                           <div className="flex items-center gap-2 mb-2">
                             <div className="text-sm text-gray-500">
-                              {entry.timestamp.toLocaleDateString('en-US', { 
-                                weekday: 'short',
-                                month: 'short', 
-                                day: 'numeric', 
-                                year: 'numeric',
-                                hour: '2-digit',
-                                minute: '2-digit'
-                              })}
+                              {formatDate(entry.created_at)}
                             </div>
                             {entry.shared && (
                               <Badge variant="secondary" className="text-xs">Shared</Badge>
                             )}
-                            {entry.peerResponse && (
+                            {entry.sim_what_i_heard && (
                               <Badge variant="secondary" className="text-xs">Has Response</Badge>
                             )}
-                            {entry.reflectionAddendum && (
+                            {entry.reflection_content && (
                               <Badge variant="secondary" className="text-xs">Reflected</Badge>
                             )}
                           </div>
@@ -115,13 +119,13 @@ export function History() {
               <ScrollArea className="max-h-[calc(80vh-120px)]">
                 <div className="space-y-4 pr-4">
                   <div className="flex items-center gap-2 text-sm text-gray-500">
-                    {currentEntry.timestamp.toLocaleDateString('en-US', { 
+                    {formatDate(currentEntry.created_at, {
                       weekday: 'long',
-                      month: 'long', 
-                      day: 'numeric', 
+                      month: 'long',
+                      day: 'numeric',
                       year: 'numeric',
                       hour: '2-digit',
-                      minute: '2-digit'
+                      minute: '2-digit',
                     })}
                   </div>
 
@@ -134,7 +138,7 @@ export function History() {
                   </div>
 
                   {/* Sent Entry (if modified) */}
-                  {currentEntry.modifiedContent && (
+                  {currentEntry.modified_content && (
                     <>
                       <Separator />
                       <div>
@@ -147,14 +151,40 @@ export function History() {
                           )}
                         </div>
                         <div className="p-4 bg-blue-50 rounded-lg">
-                          <p className="text-sm whitespace-pre-wrap">{currentEntry.modifiedContent}</p>
+                          <p className="text-sm whitespace-pre-wrap">{currentEntry.modified_content}</p>
                         </div>
                       </div>
                     </>
                   )}
 
-                  {/* Peer Response */}
-                  {currentEntry.peerResponse && (
+                  {/* AI Explanation of Changes */}
+                  {currentEntry.mediator_explanation && (
+                    <>
+                      <Separator />
+                      <div>
+                        <h3 className="font-semibold mb-2">AI Explanation of Changes</h3>
+                        <div className="p-4 bg-amber-50 rounded-lg">
+                          <p className="text-sm whitespace-pre-wrap">{currentEntry.mediator_explanation}</p>
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  {/* AI Warning */}
+                  {currentEntry.mediator_warning && (
+                    <>
+                      <Separator />
+                      <div>
+                        <h3 className="font-semibold mb-2 text-orange-600">AI Warning</h3>
+                        <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
+                          <p className="text-sm whitespace-pre-wrap">{currentEntry.mediator_warning}</p>
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  {/* Simulated Peer Response */}
+                  {currentEntry.sim_what_i_heard && (
                     <>
                       <Separator />
                       <div>
@@ -162,15 +192,15 @@ export function History() {
                         <div className="p-4 bg-green-50 rounded-lg space-y-3">
                           <div>
                             <h4 className="font-medium text-sm mb-1">What I heard:</h4>
-                            <p className="text-sm">{currentEntry.peerResponse.whatIHeard}</p>
+                            <p className="text-sm">{currentEntry.sim_what_i_heard}</p>
                           </div>
                           <div>
                             <h4 className="font-medium text-sm mb-1">What I'm wondering:</h4>
-                            <p className="text-sm">{currentEntry.peerResponse.whatImWondering}</p>
+                            <p className="text-sm">{currentEntry.sim_what_im_wondering}</p>
                           </div>
                           <div>
                             <h4 className="font-medium text-sm mb-1">What I suggest:</h4>
-                            <p className="text-sm">{currentEntry.peerResponse.whatISuggest}</p>
+                            <p className="text-sm">{currentEntry.sim_what_i_suggest}</p>
                           </div>
                         </div>
                       </div>
@@ -178,13 +208,13 @@ export function History() {
                   )}
 
                   {/* Reflection Addendum */}
-                  {currentEntry.reflectionAddendum && (
+                  {currentEntry.reflection_content && (
                     <>
                       <Separator />
                       <div>
                         <h3 className="font-semibold mb-2">Your Reflection</h3>
                         <div className="p-4 bg-purple-50 rounded-lg">
-                          <p className="text-sm whitespace-pre-wrap">{currentEntry.reflectionAddendum}</p>
+                          <p className="text-sm whitespace-pre-wrap">{currentEntry.reflection_content}</p>
                         </div>
                       </div>
                     </>
@@ -206,7 +236,7 @@ export function History() {
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction 
+              <AlertDialogAction
                 onClick={() => deleteConfirmId && handleDelete(deleteConfirmId)}
                 className="bg-red-500 hover:bg-red-600"
               >

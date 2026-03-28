@@ -10,20 +10,21 @@ export function Write() {
   const navigate = useNavigate();
   const { addJournalEntry } = useApp();
   const [content, setContent] = useState('');
+  const [saving, setSaving] = useState(false);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!content.trim()) return;
 
-    const newEntry = {
-      id: Date.now().toString(),
-      content,
-      timestamp: new Date(),
-      shared: false,
-    };
-
-    addJournalEntry(newEntry);
-    setContent('');
-    navigate('/menu');
+    setSaving(true);
+    try {
+      await addJournalEntry(content);
+      setContent('');
+      navigate('/menu');
+    } catch (err) {
+      console.error('Failed to save entry:', err);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -38,10 +39,10 @@ export function Write() {
           <CardHeader>
             <CardTitle>Write Journal Entry</CardTitle>
             <CardDescription>
-              {new Date().toLocaleDateString('en-US', { 
-                weekday: 'long', 
-                year: 'numeric', 
-                month: 'long', 
+              {new Date().toLocaleDateString('en-US', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
                 day: 'numeric',
                 hour: '2-digit',
                 minute: '2-digit'
@@ -59,8 +60,8 @@ export function Write() {
               <Button variant="outline" onClick={() => navigate('/menu')}>
                 Cancel
               </Button>
-              <Button onClick={handleSave} disabled={!content.trim()}>
-                Save Entry
+              <Button onClick={handleSave} disabled={!content.trim() || saving}>
+                {saving ? 'Saving...' : 'Save Entry'}
               </Button>
             </div>
           </CardContent>

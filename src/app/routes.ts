@@ -5,6 +5,7 @@ import { Write } from "./components/Write";
 import { History } from "./components/History";
 import { Share } from "./components/Share";
 import { Review } from "./components/Review";
+import { Admin } from "./components/Admin";
 
 export const router = createBrowserRouter([
   {
@@ -30,5 +31,9 @@ export const router = createBrowserRouter([
   {
     path: "/review",
     Component: Review,
+  },
+  {
+    path: "/admin",
+    Component: Admin,
   },
 ]);
