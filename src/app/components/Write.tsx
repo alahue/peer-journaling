@@ -1,31 +1,10 @@
-import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
-import { Textarea } from './ui/textarea';
 import { Button } from './ui/button';
-import { ArrowLeft } from 'lucide-react';
-import { useApp } from '../context/AppContext';
+import { ArrowLeft, Info } from 'lucide-react';
 
 export function Write() {
   const navigate = useNavigate();
-  const { addJournalEntry } = useApp();
-  const [content, setContent] = useState('');
-  const [saving, setSaving] = useState(false);
-
-  const handleSave = async () => {
-    if (!content.trim()) return;
-
-    setSaving(true);
-    try {
-      await addJournalEntry(content);
-      setContent('');
-      navigate('/menu');
-    } catch (err) {
-      console.error('Failed to save entry:', err);
-    } finally {
-      setSaving(false);
-    }
-  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
@@ -39,29 +18,31 @@ export function Write() {
           <CardHeader>
             <CardTitle>Write Journal Entry</CardTitle>
             <CardDescription>
-              {new Date().toLocaleDateString('en-US', {
-                weekday: 'long',
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
-              })}
+              This feature is not available during the usability study.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <Textarea
-              placeholder="Write your thoughts here..."
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              className="min-h-[400px] resize-none"
-            />
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => navigate('/menu')}>
-                Cancel
-              </Button>
-              <Button onClick={handleSave} disabled={!content.trim() || saving}>
-                {saving ? 'Saving...' : 'Save Entry'}
+          <CardContent>
+            <div className="flex flex-col items-center text-center py-12 space-y-4">
+              <div className="p-4 bg-blue-100 rounded-full">
+                <Info className="w-10 h-10 text-blue-600" />
+              </div>
+              <div className="space-y-2 max-w-md">
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Writing is disabled for this study
+                </h3>
+                <p className="text-gray-600">
+                  A sample journal entry has been provided for you in the{' '}
+                  <button
+                    onClick={() => navigate('/history')}
+                    className="text-indigo-600 font-medium hover:underline"
+                  >
+                    History tab
+                  </button>
+                  . Please use that entry to continue the usability test.
+                </p>
+              </div>
+              <Button variant="outline" onClick={() => navigate('/history')} className="mt-4">
+                Go to History
               </Button>
             </div>
           </CardContent>

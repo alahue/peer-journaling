@@ -69,19 +69,18 @@ router.post('/approve', async (req: Request, res: Response) => {
     WHERE id = ? AND user_pin = ?
   `).run(polished_entry, explanation || null, warning || null, intention, entryId, userPin);
 
-  // Generate simulated peer response asynchronously
-  generatePeerResponse(polished_entry)
-    .then((peerResponse) => {
-      const id = uuidv4();
-      db.prepare(`
-        INSERT INTO simulated_peer_responses (id, journal_entry_id, what_i_heard, what_im_wondering, what_i_suggest)
-        VALUES (?, ?, ?, ?, ?)
-      `).run(id, entryId, peerResponse.what_i_heard, peerResponse.what_im_wondering, peerResponse.what_i_suggest);
-      console.log(`Simulated peer response generated for entry ${entryId}`);
-    })
-    .catch((error) => {
-      console.error('Failed to generate simulated peer response:', error);
-    });
+  // Generate simulated peer response before responding to client
+  try {
+    const peerResponse = await generatePeerResponse(polished_entry);
+    const id = uuidv4();
+    db.prepare(`
+      INSERT INTO simulated_peer_responses (id, journal_entry_id, what_i_heard, what_im_wondering, what_i_suggest)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(id, entryId, peerResponse.what_i_heard, peerResponse.what_im_wondering, peerResponse.what_i_suggest);
+    console.log(`Simulated peer response generated for entry ${entryId}`);
+  } catch (error) {
+    console.error('Failed to generate simulated peer response:', error);
+  }
 
   res.json({ success: true });
 });
